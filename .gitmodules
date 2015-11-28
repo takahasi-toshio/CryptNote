@@ -1,0 +1,3 @@
+[submodule "3rd/qblowfish"]
+	path = 3rd/qblowfish
+	url = https://github.com/roop/qblowfish.git
