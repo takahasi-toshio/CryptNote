@@ -5,10 +5,13 @@
 #include <QEvent>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QList>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
+#include <QSet>
 #include <QStack>
 #include <QTextEdit>
 #include <QToolBar>
@@ -41,8 +44,10 @@ CryptNoteMainWindow::CryptNoteMainWindow( CryptNoteSettings* settings )
     QMenuBar* menuBar = this->menuBar();
     QMenu* fileMenu = menuBar->addMenu( tr( "&File" ) );
     QAction* openAction = fileMenu->addAction( tr( "&Open..." ) );
+    openAction->setShortcut( QKeySequence::Open );
     connect( openAction, SIGNAL( triggered( bool ) ), SLOT( open() ) );
     QAction* saveAction = fileMenu->addAction( tr( "&Save" ) );
+    saveAction->setShortcut( QKeySequence::Save );
     connect( saveAction, SIGNAL( triggered( bool ) ), SLOT( save() ) );
     QAction* saveAsAction = fileMenu->addAction( tr( "Save &as..." ) );
     connect( saveAsAction, SIGNAL( triggered( bool ) ), SLOT( saveAs() ) );
@@ -139,6 +144,7 @@ void CryptNoteMainWindow::write( QXmlStreamWriter& writer, const QTreeWidgetItem
     {
         writer.writeStartElement( "folder" );
         writer.writeAttribute( "name", item->text( 0 ) );
+        writer.writeAttribute( "expanded", item->isExpanded() ? "true" : "false" );
         for( int i = 0; i < item->childCount(); ++i )
         {
             write( writer, item->child( i ) );
@@ -163,6 +169,89 @@ QTreeWidgetItem* CryptNoteMainWindow::createFolderItem( void )const
     return item;
 }
 
+QString CryptNoteMainWindow::lastOpenDir( void )const
+{
+    const QVariant lastOpenDir = m_settings->value( "lastOpenDir" );
+    if( lastOpenDir.isValid() )
+    {
+        return lastOpenDir.toString();
+    }
+    else
+    {
+        return QString();
+    }
+}
+
+void CryptNoteMainWindow::saveLastOpenDir()const
+{
+    m_settings->setValue( "lastOpenDir", QFileInfo( m_filePath ).dir().path() );
+}
+
+QString CryptNoteMainWindow::lastSaveDir( void )const
+{
+    const QVariant lastSaveDir = m_settings->value( "lastSaveDir" );
+    if( lastSaveDir.isValid() )
+    {
+        return lastSaveDir.toString();
+    }
+    else
+    {
+        return QString();
+    }
+}
+
+void CryptNoteMainWindow::saveLastSaveDir( void )const
+{
+    m_settings->setValue( "lastSaveDir", QFileInfo( m_filePath ).dir().path() );
+}
+
+bool CryptNoteMainWindow::save( const QString& filePath, const QByteArray& key )const
+{
+    QFile file( filePath );
+    if( !file.open( QIODevice::WriteOnly ) )
+    {
+        return false;
+    }
+
+    QTreeWidgetItem* currentItem = m_treeWidget->currentItem();
+    if( isNote( currentItem ) )
+    {
+        currentItem->setData( 0, NoteRole, m_textEdit->toHtml() );
+    }
+
+    QByteArray data;
+    QXmlStreamWriter writer( &data );
+    writer.writeStartDocument();
+    writer.writeStartElement( "notes" );
+    for( int i = 0; i < m_treeWidget->topLevelItemCount(); ++i )
+    {
+        write( writer, m_treeWidget->topLevelItem( i ) );
+    }
+    writer.writeEndElement();
+    writer.writeEndDocument();
+
+    data.append( QByteArray( 8 - data.size() % 8, '\0' ) );
+
+    QBlowfish blowfish( key );
+    const QByteArray encryptedData = blowfish.encrypted( data );
+
+    file.write( encryptedData );
+
+    return true;
+}
+
+void CryptNoteMainWindow::updateWindowTitle( void )
+{
+    if( m_filePath.isEmpty() )
+    {
+        setWindowTitle( "CryptNote" );
+    }
+    else
+    {
+        setWindowTitle( QDir::toNativeSeparators( m_filePath ) + " - CryptNote" );
+    }
+}
+
 void CryptNoteMainWindow::addNote( void )
 {
     QTreeWidgetItem* item = createNoteItem();
@@ -182,7 +271,7 @@ void CryptNoteMainWindow::open( void )
     const QString filePath = QFileDialog::getOpenFileName(
                                  this,
                                  QString(),
-                                 QString(),
+                                 lastOpenDir(),
                                  tr( "CryptNote data (*.cnd)" ) );
     if( filePath.isEmpty() )
     {
@@ -192,7 +281,7 @@ void CryptNoteMainWindow::open( void )
     QFile file( filePath );
     if( !file.open( QIODevice::ReadOnly ) )
     {
-        // TODO
+        QMessageBox::critical( this, tr( "Error" ), tr( "Failed to open the specified file." ) );
         return;
     }
 
@@ -221,6 +310,7 @@ void CryptNoteMainWindow::open( void )
     QTreeWidgetItem* item = NULL;
     QList<QTreeWidgetItem*> itemList;
     QStack<QTreeWidgetItem*> folderItemStack;
+    QSet<QTreeWidgetItem*> expandedFolderItemSet;
 
     QXmlStreamReader reader( data );
     while( !reader.atEnd() )
@@ -246,6 +336,10 @@ void CryptNoteMainWindow::open( void )
             {
                 item = createFolderItem();
                 item->setText( 0, reader.attributes().value( "name" ).toString() );
+                if( reader.attributes().value( "expanded" ).toString() == "true" )
+                {
+                    expandedFolderItemSet.insert( item );
+                }
                 if( folderItemStack.isEmpty() )
                 {
                     itemList.push_back( item );
@@ -285,15 +379,27 @@ void CryptNoteMainWindow::open( void )
         {
             delete itemList[i];
         }
-        // TODO
+        QMessageBox::critical( this, tr( "Error" ), tr( "The specified password does not match." ) );
         return;
     }
+
+    m_filePath = filePath;
+    m_key = key;
+
+    saveLastOpenDir();
+    updateWindowTitle();
 
     m_treeWidget->clear();
     m_textEdit->setEnabled( false );
     for( int i = 0; i < itemList.size(); ++i )
     {
         m_treeWidget->addTopLevelItem( itemList[i] );
+    }
+
+    for( QSet<QTreeWidgetItem*>::const_iterator itr = expandedFolderItemSet.begin();
+         itr != expandedFolderItemSet.end(); ++itr )
+    {
+        ( *itr )->setExpanded( true );
     }
 }
 
@@ -304,6 +410,31 @@ void CryptNoteMainWindow::save( void )
         saveAs();
         return;
     }
+
+    QByteArray key = m_key;
+    if( key.isEmpty() )
+    {
+        CryptNoteChangePasswordDialog passwordDialog( this );
+        if( passwordDialog.exec() == QDialog::Rejected )
+        {
+            return;
+        }
+
+        QCryptographicHash hash( QCryptographicHash::Sha1 );
+        hash.addData( passwordDialog.newPassword().toUtf8() );
+
+        key = hash.result();
+    }
+
+    if( save( m_filePath, key ) )
+    {
+        m_key = key;
+        saveLastSaveDir();
+    }
+    else
+    {
+        QMessageBox::critical( this, tr( "Error" ), tr( "Failed to save the specified file." ) );
+    }
 }
 
 void CryptNoteMainWindow::saveAs( void )
@@ -311,54 +442,40 @@ void CryptNoteMainWindow::saveAs( void )
     const QString filePath = QFileDialog::getSaveFileName(
                                  this,
                                  QString(),
-                                 QString(),
+                                 lastSaveDir(),
                                  tr( "CryptNote data (*.cnd)" ) );
     if( filePath.isEmpty() )
     {
         return;
     }
 
-    CryptNoteChangePasswordDialog passwordDialog( this );
-    if( passwordDialog.exec() == QDialog::Rejected )
+    QByteArray key = m_key;
+    if( key.isEmpty() )
     {
-        return;
+        CryptNoteChangePasswordDialog passwordDialog( this );
+        if( passwordDialog.exec() == QDialog::Rejected )
+        {
+            return;
+        }
+
+        QCryptographicHash hash( QCryptographicHash::Sha1 );
+        hash.addData( passwordDialog.newPassword().toUtf8() );
+
+        key = hash.result();
     }
 
-    QFile file( filePath );
-    if( !file.open( QIODevice::WriteOnly ) )
+    if( save( filePath, key ) )
     {
-        // TODO
-        return;
+        m_filePath = filePath;
+        m_key = key;
+
+        saveLastSaveDir();
+        updateWindowTitle();
     }
-
-    QCryptographicHash hash( QCryptographicHash::Sha1 );
-    hash.addData( passwordDialog.newPassword().toUtf8() );
-
-    const QByteArray key = hash.result();
-
-    QTreeWidgetItem* currentItem = m_treeWidget->currentItem();
-    if( isNote( currentItem ) )
+    else
     {
-        currentItem->setData( 0, NoteRole, m_textEdit->toHtml() );
+        QMessageBox::critical( this, tr( "Error" ), tr( "Failed to save the specified file." ) );
     }
-
-    QByteArray data;
-    QXmlStreamWriter writer( &data );
-    writer.writeStartDocument();
-    writer.writeStartElement( "notes" );
-    for( int i = 0; i < m_treeWidget->topLevelItemCount(); ++i )
-    {
-        write( writer, m_treeWidget->topLevelItem( i ) );
-    }
-    writer.writeEndElement();
-    writer.writeEndDocument();
-
-    data.append( QByteArray( 8 - data.size() % 8, '\0' ) );
-
-    QBlowfish blowfish( key );
-    const QByteArray encryptedData = blowfish.encrypted( data );
-
-    file.write( encryptedData );
 }
 
 void CryptNoteMainWindow::onCurrentItemChanged( QTreeWidgetItem* current, QTreeWidgetItem* previous )

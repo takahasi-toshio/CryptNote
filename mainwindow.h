@@ -30,6 +30,12 @@ private:
     void write( QXmlStreamWriter& writer, const QTreeWidgetItem* item )const;
     QTreeWidgetItem* createNoteItem( void )const;
     QTreeWidgetItem* createFolderItem( void )const;
+    QString lastOpenDir( void )const;
+    void saveLastOpenDir( void )const;
+    QString lastSaveDir( void )const;
+    void saveLastSaveDir( void )const;
+    bool save( const QString& filePath, const QByteArray& key )const;
+    void updateWindowTitle( void );
 
 private slots:
     void addNote( void );
