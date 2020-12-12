@@ -53,6 +53,7 @@ CryptNoteMainWindow::CryptNoteMainWindow( CryptNoteSettings* settings )
     connect( saveAsAction, SIGNAL( triggered( bool ) ), SLOT( saveAs() ) );
 
     QToolBar* itemToolBar = addToolBar( tr( "Item" ) ) ;
+    itemToolBar->setObjectName( "ItemToolBar" );
     QAction* addFolderAction = itemToolBar->addAction( tr( "Add folder" ) );
     addFolderAction->setIcon( QIcon( ":/icons/Folder_Add.png" ) );
     connect( addFolderAction, SIGNAL( triggered( bool ) ), SLOT( addFolder() ) );
@@ -312,6 +313,9 @@ void CryptNoteMainWindow::open( void )
     QStack<QTreeWidgetItem*> folderItemStack;
     QSet<QTreeWidgetItem*> expandedFolderItemSet;
 
+    const QString strNote( "note" );
+    const QString strFolder( "folder" );
+
     QXmlStreamReader reader( data );
     while( !reader.atEnd() )
     {
@@ -319,7 +323,7 @@ void CryptNoteMainWindow::open( void )
 
         if( reader.isStartElement() )
         {
-            if( reader.qualifiedName() == "note" )
+            if( reader.qualifiedName() == strNote )
             {
                 item = createNoteItem();
                 item->setText( 0, reader.attributes().value( "name" ).toString() );
@@ -332,7 +336,7 @@ void CryptNoteMainWindow::open( void )
                     folderItemStack.top()->addChild( item );
                 }
             }
-            else if( reader.qualifiedName() == "folder" )
+            else if( reader.qualifiedName() == strFolder )
             {
                 item = createFolderItem();
                 item->setText( 0, reader.attributes().value( "name" ).toString() );
@@ -364,7 +368,7 @@ void CryptNoteMainWindow::open( void )
         }
         else if( reader.isEndElement() )
         {
-            if( reader.qualifiedName() == "folder" )
+            if( reader.qualifiedName() == strFolder )
             {
                 if( !folderItemStack.isEmpty() )
                 {
