@@ -258,6 +258,8 @@ void CryptNoteMainWindow::addNote( void )
     QTreeWidgetItem* item = createNoteItem();
     item->setText( 0, tr( "No name" ) );
     m_treeWidget->addTopLevelItem( item );
+    m_treeWidget->scrollToItem( item );
+    m_treeWidget->setCurrentItem( item );
 }
 
 void CryptNoteMainWindow::addFolder( void )
@@ -265,6 +267,8 @@ void CryptNoteMainWindow::addFolder( void )
     QTreeWidgetItem* item = createFolderItem();
     item->setText( 0, tr( "No name" ) );
     m_treeWidget->addTopLevelItem( item );
+    m_treeWidget->scrollToItem( item );
+    m_treeWidget->setCurrentItem( item );
 }
 
 void CryptNoteMainWindow::open( void )
