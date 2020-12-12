@@ -36,6 +36,7 @@ private:
     void saveLastSaveDir( void )const;
     bool save( const QString& filePath, const QByteArray& key )const;
     void updateWindowTitle( void );
+    void setModified( bool onoff );
 
 private slots:
     void addNote( void );
@@ -44,6 +45,8 @@ private slots:
     void save( void );
     void saveAs( void );
     void onCurrentItemChanged( QTreeWidgetItem* current, QTreeWidgetItem* previous );
+    void onItemChanged( QTreeWidgetItem* item, int column );
+    void onTextChanged();
 
 private:
     CryptNoteSettings* m_settings;
@@ -54,4 +57,5 @@ private:
 private:
     QString m_filePath;
     QByteArray m_key;
+    bool m_modified;
 };

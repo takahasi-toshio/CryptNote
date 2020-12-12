@@ -12,6 +12,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSet>
+#include <QSignalBlocker>
 #include <QStack>
 #include <QTextEdit>
 #include <QToolBar>
@@ -26,15 +27,22 @@
 static int NoteRole = Qt::UserRole;
 
 CryptNoteMainWindow::CryptNoteMainWindow( CryptNoteSettings* settings )
-    : m_settings( settings )
+    : m_settings( settings ),
+      m_modified( false )
 {
     m_treeWidget = new QTreeWidget;
     m_treeWidget->setHeaderHidden( true );
     m_treeWidget->setDragDropMode( QAbstractItemView::InternalMove );
+    QObject::connect(
+        m_treeWidget, SIGNAL( itemChanged( QTreeWidgetItem*, int ) ),
+        this, SLOT( onItemChanged( QTreeWidgetItem*, int ) ) );
 
     m_textEdit = new QTextEdit;
     m_textEdit->setAcceptRichText( true );
     m_textEdit->setEnabled( false );
+    QObject::connect(
+        m_textEdit, SIGNAL( textChanged() ),
+        this, SLOT( onTextChanged() ) );
 
     m_splitter = new QSplitter;
     m_splitter->addWidget( m_treeWidget );
@@ -64,6 +72,8 @@ CryptNoteMainWindow::CryptNoteMainWindow( CryptNoteSettings* settings )
     connect(
         m_treeWidget, SIGNAL( currentItemChanged( QTreeWidgetItem*, QTreeWidgetItem* ) ),
         SLOT( onCurrentItemChanged( QTreeWidgetItem*, QTreeWidgetItem* ) ) );
+
+    updateWindowTitle();
 }
 
 bool CryptNoteMainWindow::event( QEvent* e )
@@ -217,6 +227,7 @@ bool CryptNoteMainWindow::save( const QString& filePath, const QByteArray& key )
     QTreeWidgetItem* currentItem = m_treeWidget->currentItem();
     if( isNote( currentItem ) )
     {
+        QSignalBlocker signalBlocker( m_treeWidget );
         currentItem->setData( 0, NoteRole, m_textEdit->toHtml() );
     }
 
@@ -243,13 +254,44 @@ bool CryptNoteMainWindow::save( const QString& filePath, const QByteArray& key )
 
 void CryptNoteMainWindow::updateWindowTitle( void )
 {
+    QString windowTitle;
     if( m_filePath.isEmpty() )
     {
-        setWindowTitle( "CryptNote" );
+        windowTitle += tr( "(No name)" );
     }
     else
     {
-        setWindowTitle( QDir::toNativeSeparators( m_filePath ) + " - CryptNote" );
+        windowTitle += QDir::toNativeSeparators( m_filePath );
+    }
+
+    if( m_modified )
+    {
+        windowTitle += " ";
+        windowTitle += tr( "(Modified)" );
+    }
+
+    windowTitle += " - CryptNote";
+
+    setWindowTitle( windowTitle );
+}
+
+void CryptNoteMainWindow::setModified( bool onoff )
+{
+    if( onoff )
+    {
+        if( !m_modified )
+        {
+            m_modified = true;
+            updateWindowTitle();
+        }
+    }
+    else
+    {
+        if( m_modified )
+        {
+            m_modified = false;
+            updateWindowTitle();
+        }
     }
 }
 
@@ -260,6 +302,7 @@ void CryptNoteMainWindow::addNote( void )
     m_treeWidget->addTopLevelItem( item );
     m_treeWidget->scrollToItem( item );
     m_treeWidget->setCurrentItem( item );
+    setModified( true );
 }
 
 void CryptNoteMainWindow::addFolder( void )
@@ -269,6 +312,7 @@ void CryptNoteMainWindow::addFolder( void )
     m_treeWidget->addTopLevelItem( item );
     m_treeWidget->scrollToItem( item );
     m_treeWidget->setCurrentItem( item );
+    setModified( true );
 }
 
 void CryptNoteMainWindow::open( void )
@@ -437,7 +481,10 @@ void CryptNoteMainWindow::save( void )
     if( save( m_filePath, key ) )
     {
         m_key = key;
+        m_modified = false;
+
         saveLastSaveDir();
+        updateWindowTitle();
     }
     else
     {
@@ -476,6 +523,7 @@ void CryptNoteMainWindow::saveAs( void )
     {
         m_filePath = filePath;
         m_key = key;
+        m_modified = false;
 
         saveLastSaveDir();
         updateWindowTitle();
@@ -490,17 +538,30 @@ void CryptNoteMainWindow::onCurrentItemChanged( QTreeWidgetItem* current, QTreeW
 {
     if( isNote( previous ) )
     {
+        QSignalBlocker signalBlocker( m_treeWidget );
         previous->setData( 0, NoteRole, m_textEdit->toHtml() );
     }
 
     if( isFolder( current ) )
     {
         m_textEdit->setEnabled( false );
+        QSignalBlocker signalBlocker( m_textEdit );
         m_textEdit->clear();
     }
     else if( isNote( current ) )
     {
         m_textEdit->setEnabled( true );
+        QSignalBlocker signalBlock( m_textEdit );
         m_textEdit->setHtml( current->data( 0, NoteRole ).toString() );
     }
+}
+
+void CryptNoteMainWindow::onItemChanged( QTreeWidgetItem* item, int column )
+{
+    setModified( true );
+}
+
+void CryptNoteMainWindow::onTextChanged()
+{
+    setModified( true );
 }

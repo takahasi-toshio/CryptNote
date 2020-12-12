@@ -85,5 +85,13 @@
         <source>Failed to save the specified file.</source>
         <translation>指定されたファイルを保存するのに失敗しました。</translation>
     </message>
+    <message>
+        <source>(No name)</source>
+        <translation>(名称未設定)</translation>
+    </message>
+    <message>
+        <source>(Modified)</source>
+        <translation>(更新)</translation>
+    </message>
 </context>
 </TS>
