@@ -2,6 +2,7 @@
   <qresource>
     <file>icons/Folder_Add.png</file>
     <file>icons/File_Add.png</file>
+    <file>icons/Trash.png</file>
     <file>trans.ja.qm</file>
   </qresource>
 </RCC>

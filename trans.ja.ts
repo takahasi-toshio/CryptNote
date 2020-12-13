@@ -93,5 +93,9 @@
         <source>(Modified)</source>
         <translation>(更新)</translation>
     </message>
+    <message>
+        <source>Remove</source>
+        <translation>削除</translation>
+    </message>
 </context>
 </TS>

@@ -68,12 +68,16 @@ CryptNoteMainWindow::CryptNoteMainWindow( CryptNoteSettings* settings )
     QAction* addNoteAction = itemToolBar->addAction( tr( "Add note" ) );
     addNoteAction->setIcon( QIcon( ":/icons/File_Add.png" ) );
     connect( addNoteAction, SIGNAL( triggered( bool ) ), SLOT( addNote() ) );
+    m_removeAction = itemToolBar->addAction( tr( "Remove" ) );
+    m_removeAction->setIcon( QIcon( ":/icons/Trash.png" ) );
+    connect( m_removeAction, SIGNAL( triggered( bool ) ), SLOT( remove() ) );
 
     connect(
         m_treeWidget, SIGNAL( currentItemChanged( QTreeWidgetItem*, QTreeWidgetItem* ) ),
         SLOT( onCurrentItemChanged( QTreeWidgetItem*, QTreeWidgetItem* ) ) );
 
     updateWindowTitle();
+    updateRemoveAction();
 }
 
 bool CryptNoteMainWindow::event( QEvent* e )
@@ -295,6 +299,11 @@ void CryptNoteMainWindow::setModified( bool onoff )
     }
 }
 
+void CryptNoteMainWindow::updateRemoveAction( void )
+{
+    m_removeAction->setEnabled( m_treeWidget->currentItem() );
+}
+
 void CryptNoteMainWindow::addNote( void )
 {
     QTreeWidgetItem* item = createNoteItem();
@@ -313,6 +322,16 @@ void CryptNoteMainWindow::addFolder( void )
     m_treeWidget->scrollToItem( item );
     m_treeWidget->setCurrentItem( item );
     setModified( true );
+}
+
+void CryptNoteMainWindow::remove( void )
+{
+    QTreeWidgetItem* currentItem = m_treeWidget->currentItem();
+    if( currentItem )
+    {
+        delete currentItem;
+        setModified( true );
+    }
 }
 
 void CryptNoteMainWindow::open( void )
@@ -554,6 +573,8 @@ void CryptNoteMainWindow::onCurrentItemChanged( QTreeWidgetItem* current, QTreeW
         QSignalBlocker signalBlock( m_textEdit );
         m_textEdit->setHtml( current->data( 0, NoteRole ).toString() );
     }
+
+    updateRemoveAction();
 }
 
 void CryptNoteMainWindow::onItemChanged( QTreeWidgetItem* item, int column )
@@ -561,7 +582,7 @@ void CryptNoteMainWindow::onItemChanged( QTreeWidgetItem* item, int column )
     setModified( true );
 }
 
-void CryptNoteMainWindow::onTextChanged()
+void CryptNoteMainWindow::onTextChanged( void )
 {
     setModified( true );
 }

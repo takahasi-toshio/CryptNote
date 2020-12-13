@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QAction>
 #include <QByteArray>
 #include <QMainWindow>
 #include <QSplitter>
@@ -37,22 +38,25 @@ private:
     bool save( const QString& filePath, const QByteArray& key )const;
     void updateWindowTitle( void );
     void setModified( bool onoff );
+    void updateRemoveAction( void );
 
 private slots:
     void addNote( void );
     void addFolder( void );
+    void remove( void );
     void open( void );
     void save( void );
     void saveAs( void );
     void onCurrentItemChanged( QTreeWidgetItem* current, QTreeWidgetItem* previous );
     void onItemChanged( QTreeWidgetItem* item, int column );
-    void onTextChanged();
+    void onTextChanged( void );
 
 private:
     CryptNoteSettings* m_settings;
     QSplitter* m_splitter;
     QTreeWidget* m_treeWidget;
     QTextEdit* m_textEdit;
+    QAction* m_removeAction;
 
 private:
     QString m_filePath;
